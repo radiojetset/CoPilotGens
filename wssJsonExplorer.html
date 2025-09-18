@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Editor with WebSocket</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Gotham', sans-serif;
+            background: #000000;
+            min-height: 100vh;
+            color: #ffffff;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #000000;
+        }
+
+        .header {
+            background: #000000;
+            padding: 24px 40px;
+            border-bottom: 1px solid #222222;
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            color: #999999;
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        .controls {
+            padding: 16px 40px;
+            background: #000000;
+            border-bottom: 1px solid #222222;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .websocket-controls {
+            padding: 16px 40px;
+            background: #080808;
+            border-bottom: 1px solid #222222;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .ws-input {
+            flex: 0 1 300px;
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            color: #ffffff;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .ws-input:focus {
+            border-color: #666666;
+        }
+
+        button {
+            padding: 8px 24px;
+            border: 2px solid #222222;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: #ffffff;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            transition: left 0.3s ease;
+            z-index: 0;
+        }
+
+        button:hover::before {
+            left: 0;
+        }
+
+        button:hover {
+            color: #000000;
+            border-color: #ffffff;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button:disabled:hover::before {
+            left: -100%;
+        }
+
+        button span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-primary {
+            background: #ffffff;
+            color: #000000;
+            border-color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: transparent;
+            color: #ffffff;
+        }
+
+        .btn-success {
+            border-color: #48bb78;
+            color: #48bb78;
+        }
+
+        .btn-success::before {
+            background: #48bb78;
+        }
+
+        .btn-success:hover {
+            color: #ffffff;
+            border-color: #48bb78;
+        }
+
+        .btn-danger {
+            border-color: #cc0000;
+            color: #cc0000;
+        }
+
+        .btn-danger::before {
+            background: #cc0000;
+        }
+
+        .btn-danger:hover {
+            color: #ffffff;
+            border-color: #cc0000;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            overflow-y: auto;
+        }
+
+        .tree-panel {
+            background: #080808;
+            border-right: 1px solid #222222;
+            width: 480px;
+            padding: 24px;
+        }
+
+        .editor-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000000;
+        }
+
+        .log-panel {
+            background: #080808;
+            border-left: 1px solid #222222;
+            width: 400px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .panel h3 {
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #999999;
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            padding: 24px 40px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #jsonEditor {
+            flex: 1;
+            width: 100%;
+            padding: 20px;
+            background: #080808;
+            border: 1px solid #222222;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: none;
+            transition: all 0.2s ease;
+            color: #ffffff;
+        }
+
+        #jsonEditor::placeholder {
+            color: #666666;
+        }
+
+        #jsonEditor:focus {
+            outline: none;
+            border-color: #ffffff;
+            background: #0a0a0a;
+        }
+
+        #jsonEditor.error {
+            border-color: #cc0000;
+            background-color: #0d0000;
+        }
+
+        .log-output {
+            flex: 1;
+            background: #0a0a0a;
+            border: 1px solid #222222;
+            border-radius: 4px;
+            padding: 12px;
+            overflow-y: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            color: #999999;
+        }
+
+        .log-entry.error {
+            color: #cc0000;
+        }
+
+        .log-entry.success {
+            color: #48bb78;
+        }
+
+        .log-entry.info {
+            color: #60a5fa;
+        }
+
+        .log-timestamp {
+            color: #666666;
+            margin-right: 8px;
+        }
+
+        .tree-item {
+            margin-bottom: 1px;
+            position: relative;
+        }
+
+        .tree-item-content {
+            display: flex;
+            align-items: center;
+            padding: 2px 0;
+            position: relative;
+        }
+
+        .tree-item-content:hover {
+            background-color: #1a1a1a;
+            border-radius: 2px;
+        }
+
+        .tree-key {
+            padding: 2px 4px;
+            border-radius: 2px;
+            display: inline-block;
+            user-select: none;
+            font-size: 12px;
+            color: #cccccc;
+            cursor: default;
+            position: relative;
+        }
+
+        .tree-key.expandable {
+            cursor: pointer;
+        }
+
+        .tree-key.expandable::before {
+            content: '▶';
+            display: inline-block;
+            width: 16px;
+            transition: transform 0.15s;
+            font-size: 10px;
+            color: #666666;
+        }
+
+        .tree-key.expanded::before {
+            transform: rotate(90deg);
+        }
+
+        .tree-value {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            margin-left: 8px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            cursor: text;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .tree-value.editable:hover {
+            border-color: #333333;
+            background-color: #1a1a1a;
+        }
+
+        .tree-value-input {
+            background: #1a1a1a;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            outline: none;
+            width: auto;
+            min-width: 80px;
+        }
+
+        .tree-value.string {
+            color: #4ade80;
+        }
+
+        .tree-value.number {
+            color: #60a5fa;
+        }
+
+        .tree-value.boolean {
+            color: #f472b6;
+        }
+
+        .tree-value.null {
+            color: #6b7280;
+        }
+
+        .status-bar {
+            padding: 12px 40px;
+            background: #000000;
+            border-top: 1px solid #222222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #999999;
+            letter-spacing: 0.5px;
+        }
+
+        .status-message {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #00ff00;
+        }
+
+        .status-indicator.error {
+            background: #cc0000;
+        }
+
+        .status-indicator.warning {
+            background: #ffaa00;
+        }
+
+        .ws-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ws-status.connected {
+            background: #1a2f1a;
+            color: #48bb78;
+            border: 1px solid #2d5a2d;
+        }
+
+        .ws-status.disconnected {
+            background: #2f1a1a;
+            color: #cc0000;
+            border: 1px solid #5a2d2d;
+        }
+
+        .ws-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .decoder-section {
+            margin-top: 16px;
+            padding: 12px;
+            background: #0a0a0a;
+            border: 1px solid #222222;
+            border-radius: 4px;
+        }
+
+        .decoder-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666666;
+            margin-bottom: 8px;
+        }
+
+        .decoder-input {
+            width: 100%;
+            min-height: 60px;
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            color: #ffffff;
+            padding: 8px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            border-radius: 2px;
+            resize: vertical;
+        }
+
+        .object-counter {
+            background: #1a1a1a;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 10px;
+            color: #60a5fa;
+            border: 1px solid #333333;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            padding: 8px 24px;
+            border: 2px solid #222222;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: #ffffff;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444444;
+        }
+
+        @media (max-width: 1200px) {
+            .log-panel {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .tree-panel {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #222222;
+                max-height: 300px;
+            }
+            
+            .content {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>JSON Editor with WebSocket</h1>
+            <p>Real-time data collection and editing with WebSocket connectivity</p>
+        </div>
+        
+        <div class="websocket-controls">
+            <input type="text" class="ws-input" id="serverUrl" value="wss://localhost:8443" placeholder="WebSocket URL">
+            <button id="connectBtn" class="btn-success" onclick="connectWebSocket()">
+                <span>Connect</span>
+            </button>
+            <button id="disconnectBtn" class="btn-danger" onclick="disconnectWebSocket()" disabled>
+                <span>Disconnect</span>
+            </button>
+            <div class="ws-status disconnected" id="wsStatus">
+                <span class="ws-status-dot"></span>
+                <span>Disconnected</span>
+            </div>
+            <div class="object-counter">
+                <span id="objectCount">0</span> OBJECTS
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn-primary" onclick="formatJSON()">
+                <span>Format</span>
+            </button>
+            <button onclick="validateJSON()">
+                <span>Validate</span>
+            </button>
+            <button onclick="minifyJSON()">
+                <span>Minify</span>
+            </button>
+            <button class="btn-danger" onclick="clearEditor()">
+                <span>Clear</span>
+            </button>
+            <button onclick="clearObjects()">
+                <span>Clear Objects</span>
+            </button>
+            <label for="fileInput" class="file-label">
+                <span>Load File</span>
+            </label>
+            <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
+            <button onclick="downloadJSON()">
+                <span>Download</span>
+            </button>
+            <button onclick="loadSample()">
+                <span>Sample</span>
+            </button>
+        </div>
+        
+        <div class="content">
+            <div class="tree-panel panel">
+                <div class="panel-header">
+                    <h3>Structure</h3>
+                    <div class="tree-controls">
+                        <button class="tree-btn" onclick="expandAll()">Expand All</button>
+                        <button class="tree-btn" onclick="collapseAll()">Collapse All</button>
+                    </div>
+                </div>
+                <div id="treeView"></div>
+            </div>
+            
+            <div class="editor-panel panel">
+                <div class="editor-wrapper">
+                    <textarea id="jsonEditor" placeholder="Enter JSON data or receive from WebSocket..."></textarea>
+                </div>
+            </div>
+            
+            <div class="log-panel panel">
+                <div class="panel-header">
+                    <h3>WebSocket Log</h3>
+                    <button class="tree-btn" onclick="clearLog()">Clear</button>
+                </div>
+                <div class="log-output" id="logOutput"></div>
+                
+                <div class="decoder-section">
+                    <div class="decoder-title">Decoder Function (Edit to Transform Data)</div>
+                    <textarea class="decoder-input" id="decoderFunction" placeholder="// Example decoder function:
+// return data; // Pass through unchanged
+// return JSON.parse(data); // Parse JSON string
+// return { transformed: data }; // Transform data">// Default decoder - passes data through unchanged
+return data;</textarea>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-message">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">READY</span>
+            </div>
+            <div>
+                <span id="charCount">0 CHARACTERS</span> • 
+                <span id="lineCount">0 LINES</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const editor = document.getElementById('jsonEditor');
+        const treeView = document.getElementById('treeView');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const charCount = document.getElementById('charCount');
+        const lineCount = document.getElementById('lineCount');
+        const logOutput = document.getElementById('logOutput');
+        const serverUrlEl = document.getElementById('serverUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const wsStatusEl = document.getElementById('wsStatus');
+        const objectCountEl = document.getElementById('objectCount');
+        const decoderFunctionEl = document.getElementById('decoderFunction');
+        
+        // State
+        let currentJson = [];  // Array to hold all JSON objects
+        let socket = null;
+        let objectCounter = 0;
+        
+        // Custom decoder function
+        function getDecoderFunction() {
+            const funcBody = decoderFunctionEl.value || 'return data;';
+            try {
+                return new Function('data', funcBody);
+            } catch (e) {
+                log(`Decoder error: ${e.message}`, 'error');
+                return (data) => data;
+            }
+        }
+        
+        // Log message to output area
+        function log(message, type = 'info') {
+            const now = new Date();
+            const timestamp = now.toTimeString().substring(0, 8);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="log-timestamp">${timestamp}</span>${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+        
+        // Clear log
+        function clearLog() {
+            logOutput.innerHTML = '';
+            log('Log cleared', 'info');
+        }
+        
+        // WebSocket functions
+        function connectWebSocket() {
+            const url = serverUrlEl.value.trim();
+            
+            if (!url) {
+                log('Please enter a valid WebSocket URL', 'error');
+                updateStatus('Invalid URL', 'error');
+                return;
+            }
+            
+            try {
+                log(`Connecting to ${url}...`, 'info');
+                socket = new WebSocket(url);
+                
+                socket.onopen = function() {
+                    log('Connected to server', 'success');
+                    wsStatusEl.className = 'ws-status connected';
+                    wsStatusEl.innerHTML = '<span class="ws-status-dot"></span><span>Connected</span>';
+                    
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    
+                    updateStatus('WebSocket Connected', 'success');
+                    
+                    if (url.startsWith('wss://')) {
+                        log('Connection is secure (WSS)', 'info');
+                    } else {
+                        log('Connection is not secure (WS)', 'warning');
+                    }
+                };
+                
+                socket.onclose = function(event) {
+                    log(`Disconnected (Code: ${event.code})`, 'info');
+                    wsStatusEl.className = 'ws-status disconnected';
+                    wsStatusEl.innerHTML = '<span class="ws-status-dot"></span><span>Disconnected</span>';
+                    
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    socket = null;
+                    
+                    updateStatus('WebSocket Disconnected', 'warning');
+                };
+                
+                socket.onerror = function(error) {
+                    log('WebSocket error occurred', 'error');
+                    console.error('WebSocket error:', error);
+                    updateStatus('WebSocket Error', 'error');
+                };
+                
+                socket.onmessage = function(event) {
+                    log(`Received data (${event.data.length} bytes)`, 'info');
+                    
+                    try {
+                        // Apply decoder function
+                        const decoder = getDecoderFunction();
+                        let decodedData = decoder(event.data);
+                        
+                        // Try to parse as JSON if it's a string
+                        if (typeof decodedData === 'string') {
+                            try {
+                                decodedData = JSON.parse(decodedData);
+                            } catch (e) {
+                                // If not JSON, wrap in object
+                                decodedData = { raw: decodedData, timestamp: new Date().toISOString() };
+                            }
+                        }
+                        
+                        // Add timestamp if not present
+                        if (!decodedData.timestamp) {
+                            decodedData.timestamp = new Date().toISOString();
+                        }
+                        
+                        // Add to object collection
+                        addJsonObject(decodedData);
+                        
+                    } catch (error) {
+                        log(`Error processing message: ${error.message}`, 'error');
+                    }
+                };
+            } catch (error) {
+                log(`Failed to connect: ${error.message}`, 'error');
+                updateStatus('Connection Failed', 'error');
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.close();
+                log('Disconnecting from server...', 'info');
+            }
+        }
+        
+        // Add JSON object to collection
+        function addJsonObject(obj) {
+            objectCounter++;
+            const wrappedObject = {
+                id: objectCounter,
+                received: new Date().toISOString(),
+                data: obj
+            };
+            
+            currentJson.push(wrappedObject);
+            
+            // Update display
+            editor.value = JSON.stringify(currentJson, null, 2);
+            updateTree(currentJson);
+            updateCounts();
+            updateObjectCount();
+            
+            log(`Added object #${objectCounter}`, 'success');
+            updateStatus(`Object #${objectCounter} added`, 'success');
+        }
+        
+        // Clear objects
+        function clearObjects() {
+            currentJson = [];
+            objectCounter = 0;
+            editor.value = '[]';
+            updateTree(currentJson);
+            updateCounts();
+            updateObjectCount();
+            updateStatus('Objects cleared', 'success');
+            log('All objects cleared', 'info');
+        }
+        
+        // Update object count display
+        function updateObjectCount() {
+            objectCountEl.textContent = currentJson.length;
+        }
+        
+        // Update status bar
+        function updateStatus(message, type = 'success') {
+            statusText.textContent = message.toUpperCase();
+            statusIndicator.className = 'status-indicator';
+            if (type === 'error') {
+                statusIndicator.classList.add('error');
+            } else if (type === 'warning') {
+                statusIndicator.classList.add('warning');
+            }
+        }
+        
+        // Update character and line count
+        function updateCounts() {
+            const text = editor.value;
+            charCount.textContent = `${text.length} CHARACTERS`;
+            lineCount.textContent = `${text.split('\n').length} LINES`;
+        }
+        
+        // Format JSON
+        function formatJSON() {
+            try {
+                const json = JSON.parse(editor.value);
+                currentJson = Array.isArray(json) ? json : [json];
+                editor.value = JSON.stringify(currentJson, null, 2);
+                editor.classList.remove('error');
+                updateStatus('Formatted', 'success');
+                updateTree(currentJson);
+                updateCounts();
+                updateObjectCount();
+            } catch (e) {
+                editor.classList.add('error');
+                updateStatus(`Error: ${e.message}`, 'error');
+            }
+        }
+        
+        // Validate JSON
+        function validateJSON() {
+            try {
+                const json = JSON.parse(editor.value);
+                currentJson = Array.isArray(json) ? json : [json];
+                editor.classList.remove('error');
+                updateStatus('Valid', 'success');
+                updateTree(currentJson);
+                updateObjectCount();
+                return true;
+            } catch (e) {
+                editor.classList.add('error');
+                updateStatus(`Invalid: ${e.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Minify JSON
+        function minifyJSON() {
+            try {
+                const json = JSON.parse(editor.value);
+                currentJson = Array.isArray(json) ? json : [json];
+                editor.value = JSON.stringify(currentJson);
+                editor.classList.remove('error');
+                updateStatus('Minified', 'success');
+                updateTree(currentJson);
+                updateCounts();
+            } catch (e) {
+                editor.classList.add('error');
+                updateStatus(`Error: ${e.message}`, 'error');
+            }
+        }
+        
+        // Clear editor
+        function clearEditor() {
+            editor.value = '';
+            editor.classList.remove('error');
+            treeView.innerHTML = '';
+            currentJson = [];
+            objectCounter = 0;
+            updateStatus('Cleared', 'success');
+            updateCounts();
+            updateObjectCount();
+        }
+        
+        // Load file
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    editor.value = e.target.result;
+                    validateJSON();
+                    updateCounts();
+                    updateStatus(`Loaded: ${file.name}`, 'success');
+                };
+                reader.readAsText(file);
+            }
+        }
+        
+        // Download JSON
+        function downloadJSON() {
+            if (!validateJSON()) {
+                updateStatus('Cannot download invalid JSON', 'error');
+                return;
+            }
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(editor.value);
+            const downloadAnchorNode = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `data_${timestamp}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            updateStatus('Downloaded', 'success');
+        }
+        
+        // Load sample JSON
+        function loadSample() {
+            const sampleJSON = [{
+                id: 1,
+                received: new Date().toISOString(),
+                data: {
+                    type: "telemetry",
+                    device: "PLC_001",
+                    values: {
+                        temperature: 23.5,
+                        pressure: 1013.25,
+                        status: "operational"
+                    }
+                }
+            }];
+            
+            currentJson = sampleJSON;
+            editor.value = JSON.stringify(sampleJSON, null, 2);
+            updateTree(sampleJSON);
+            updateStatus('Sample loaded', 'success');
+            updateCounts();
+            updateObjectCount();
+        }
+        
+        // Update tree view
+        function updateTree(json) {
+            treeView.innerHTML = '';
+            const rootContainer = document.createElement('div');
+            buildEditableTree(json, rootContainer, 'root', [], 0);
+            treeView.appendChild(rootContainer);
+        }
+        
+        // Build tree
+        function buildEditableTree(obj, container, key, path, level = 0) {
+            const item = document.createElement('div');
+            item.className = 'tree-item';
+            item.style.marginLeft = `${level * 20}px`;
+            
+            const itemContent = document.createElement('div');
+            itemContent.className = 'tree-item-content';
+            
+            const keyEl = document.createElement('span');
+            keyEl.className = 'tree-key';
+            
+            if (obj !== null && typeof obj === 'object') {
+                const isArray = Array.isArray(obj);
+                const isEmpty = Object.keys(obj).length === 0;
+                
+                keyEl.textContent = isArray ? `${key} [${Object.keys(obj).length}]` : `${key} {${Object.keys(obj).length}}`;
+                
+                itemContent.appendChild(keyEl);
+                
+                if (!isEmpty) {
+                    keyEl.classList.add('expandable', 'expanded');
+                    
+                    const childContainer = document.createElement('div');
+                    childContainer.style.display = 'block';
+                    
+                    keyEl.onclick = function() {
+                        keyEl.classList.toggle('expanded');
+                        childContainer.style.display = keyEl.classList.contains('expanded') ? 'block' : 'none';
+                    };
+                    
+                    item.appendChild(itemContent);
+                    container.appendChild(item);
+                    
+                    for (let prop in obj) {
+                        const newPath = [...path, prop];
+                        buildEditableTree(obj[prop], childContainer, prop, newPath, level + 1);
+                    }
+                    
+                    container.appendChild(childContainer);
+                } else {
+                    keyEl.classList.add('expandable');
+                    item.appendChild(itemContent);
+                    container.appendChild(item);
+                }
+            } else {
+                keyEl.textContent = key;
+                
+                const valueEl = document.createElement('span');
+                valueEl.className = 'tree-value editable';
+                
+                if (obj === null) {
+                    valueEl.textContent = 'null';
+                    valueEl.classList.add('null');
+                } else if (typeof obj === 'string') {
+                    valueEl.textContent = `"${obj}"`;
+                    valueEl.classList.add('string');
+                } else if (typeof obj === 'number') {
+                    valueEl.textContent = obj;
+                    valueEl.classList.add('number');
+                } else if (typeof obj === 'boolean') {
+                    valueEl.textContent = obj;
+                    valueEl.classList.add('boolean');
+                } else {
+                    valueEl.textContent = String(obj);
+                }
+                
+                valueEl.onclick = () => editValue(valueEl, path, typeof obj);
+                
+                itemContent.appendChild(keyEl);
+                itemContent.appendChild(valueEl);
+                item.appendChild(itemContent);
+                container.appendChild(item);
+            }
+        }
+        
+        // Edit value
+        function editValue(element, path, originalType) {
+            const currentValue = element.textContent;
+            const input = document.createElement('input');
+            input.className = 'tree-value-input';
+            input.value = currentValue.replace(/^"|"$/g, '');
+            
+            element.replaceWith(input);
+            input.focus();
+            input.select();
+            
+            const save = () => {
+                let newValue = input.value;
+                
+                if (newValue === 'null') {
+                    newValue = null;
+                } else if (newValue === 'true' || newValue === 'false') {
+                    newValue = newValue === 'true';
+                } else if (!isNaN(newValue) && newValue !== '') {
+                    newValue = parseFloat(newValue);
+                }
+                
+                updateJsonValue(path, newValue);
+                input.replaceWith(element);
+            };
+            
+            input.onblur = save;
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    save();
+                } else if (e.key === 'Escape') {
+                    input.replaceWith(element);
+                }
+            };
+        }
+        
+        // Update JSON value
+        function updateJsonValue(path, value) {
+            if (path.length === 0) {
+                currentJson = value;
+            } else {
+                let target = currentJson;
+                for (let i = 0; i < path.length - 1; i++) {
+                    target = target[path[i]];
+                }
+                target[path[path.length - 1]] = value;
+            }
+            
+            syncToEditor();
+            updateTree(currentJson);
+            updateStatus('Value updated', 'success');
+        }
+        
+        // Sync to editor
+        function syncToEditor() {
+            editor.value = JSON.stringify(currentJson, null, 2);
+            editor.classList.remove('error');
+            updateCounts();
+        }
+        
+        // Expand/Collapse all
+        function expandAll() {
+            document.querySelectorAll('.tree-key.expandable').forEach(key => {
+                key.classList.add('expanded');
+                const sibling = key.closest('.tree-item').nextElementSibling;
+                if (sibling) sibling.style.display = 'block';
+            });
+        }
+        
+        function collapseAll() {
+            document.querySelectorAll('.tree-key.expandable').forEach(key => {
+                key.classList.remove('expanded');
+                const sibling = key.closest('.tree-item').nextElementSibling;
+                if (sibling) sibling.style.display = 'none';
+            });
+        }
+        
+        // Real-time validation
+        let validationTimeout;
+        editor.addEventListener('input', function() {
+            updateCounts();
+            clearTimeout(validationTimeout);
+            validationTimeout = setTimeout(() => {
+                if (editor.value.trim()) {
+                    validateJSON();
+                }
+            }, 500);
+        });
+        
+        // Initialize
+        updateCounts();
+        updateObjectCount();
+        currentJson = [];
+        editor.value = '[]';
+        log('System initialized', 'success');
+        
+        // Load default decoder
+        decoderFunctionEl.value = `// Decoder function - transform incoming WebSocket data
+// The 'data' parameter contains the raw message from WebSocket
+// Return the processed data to be added to the collection
+
+// Example: Parse JSON and add metadata
+try {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    return {
+        ...parsed,
+        processed: true,
+        processedAt: new Date().toISOString()
+    };
+} catch (e) {
+    // If parsing fails, return raw data
+    return { 
+        raw: data, 
+        error: e.message,
+        timestamp: new Date().toISOString()
+    };
+}`;
+    </script>
+</body>
+</html>
