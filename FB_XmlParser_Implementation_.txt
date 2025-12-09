@@ -1,0 +1,119 @@
+// Implementation part of FB_XmlParser
+
+bParseEdge(CLK := bParse);
+
+IF bParseEdge. Q THEN
+    // Initialize parsing
+    bDone := FALSE;
+    bError := FALSE;
+    sErrorMsg := '';
+    nElementCount := 0;
+    nPos := 1;
+    nLength := LEN(sXmlInput);
+    nCurrentElement := 0;
+    bInTag := FALSE;
+    bInValue := FALSE;
+    sTagName := '';
+    sTagValue := '';
+    
+    // Clear elements array
+    FOR nCurrentElement := 1 TO 100 DO
+        aElements[nCurrentElement]. sTagName := '';
+        aElements[nCurrentElement].sValue := '';
+        aElements[nCurrentElement].sAttributes := '';
+        aElements[nCurrentElement]. nParentIndex := 0;
+        aElements[nCurrentElement].nDepth := 0;
+        aElements[nCurrentElement].bHasChildren := FALSE;
+    END_FOR
+    nCurrentElement := 0;
+END_IF
+
+IF bParse AND NOT bDone THEN
+    // Main parsing loop - process characters
+    WHILE nPos <= nLength AND NOT bError DO
+        sCurrentChar := MID(sXmlInput, 1, nPos);
+        
+        CASE nState OF
+            0: // Looking for tag start '<'
+                IF sCurrentChar = '<' THEN
+                    // Save any text content before this tag
+                    IF LEN(sTagValue) > 0 AND nCurrentElement > 0 THEN
+                        aElements[nCurrentElement].sValue := CONCAT(
+                            aElements[nCurrentElement].sValue, 
+                            F_TrimWhitespace(sTagValue)
+                        );
+                    END_IF
+                    sTagValue := '';
+                    sTagName := '';
+                    bInTag := TRUE;
+                    nState := 1;
+                ELSE
+                    // Accumulate text content
+                    sTagValue := CONCAT(sTagValue, sCurrentChar);
+                END_IF
+                
+            1: // Reading tag name or detecting closing tag
+                IF sCurrentChar = '/' THEN
+                    bIsClosingTag := TRUE;
+                ELSIF sCurrentChar = '>' THEN
+                    // End of tag
+                    IF bIsClosingTag THEN
+                        // Closing tag - move up in hierarchy
+                        bIsClosingTag := FALSE;
+                    ELSE
+                        // Opening tag - add new element
+                        nCurrentElement := nCurrentElement + 1;
+                        nElementCount := nCurrentElement;
+                        aElements[nCurrentElement].sTagName := F_TrimWhitespace(sTagName);
+                        aElements[nCurrentElement].nDepth := F_GetCurrentDepth(aElements, nCurrentElement);
+                    END_IF
+                    bInTag := FALSE;
+                    sTagName := '';
+                    nState := 0;
+                ELSIF sCurrentChar = ' ' THEN
+                    // Space in tag - attributes follow
+                    nState := 2;
+                ELSIF sCurrentChar = '?' THEN
+                    // XML declaration, skip
+                    nState := 3;
+                ELSE
+                    sTagName := CONCAT(sTagName, sCurrentChar);
+                END_IF
+                
+            2: // Reading attributes
+                IF sCurrentChar = '>' THEN
+                    // End of tag with attributes
+                    IF NOT bIsClosingTag THEN
+                        nCurrentElement := nCurrentElement + 1;
+                        nElementCount := nCurrentElement;
+                        aElements[nCurrentElement].sTagName := F_TrimWhitespace(sTagName);
+                        aElements[nCurrentElement]. sAttributes := sAttributeName;
+                    END_IF
+                    bIsClosingTag := FALSE;
+                    bInTag := FALSE;
+                    sTagName := '';
+                    sAttributeName := '';
+                    nState := 0;
+                ELSIF sCurrentChar = '/' THEN
+                    // Self-closing tag
+                    nCurrentElement := nCurrentElement + 1;
+                    nElementCount := nCurrentElement;
+                    aElements[nCurrentElement]. sTagName := F_TrimWhitespace(sTagName);
+                    aElements[nCurrentElement].sAttributes := sAttributeName;
+                    // Skip the '>'
+                ELSE
+                    sAttributeName := CONCAT(sAttributeName, sCurrentChar);
+                END_IF
+                
+            3: // Skip XML declaration
+                IF sCurrentChar = '>' THEN
+                    nState := 0;
+                    bInTag := FALSE;
+                END_IF
+        END_CASE
+        
+        nPos := nPos + 1;
+    END_WHILE
+    
+    bDone := TRUE;
+END_IF

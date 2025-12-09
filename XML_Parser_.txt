@@ -1,0 +1,38 @@
+FUNCTION_BLOCK FB_XmlParser
+VAR_INPUT
+    sXmlInput       :  STRING(10000);    // Input XML string
+    bParse          : BOOL;              // Trigger to start parsing
+END_VAR
+
+VAR_OUTPUT
+    bDone           : BOOL;              // Parsing complete
+    bError          : BOOL;              // Error occurred
+    sErrorMsg       : STRING(255);       // Error message
+    nElementCount   : INT;               // Number of elements found
+END_VAR
+
+VAR
+    // Parsing state
+    nState          : INT := 0;
+    nPos            : INT := 1;
+    nLength         : INT;
+    sCurrentChar    : STRING(1);
+    
+    // Element storage
+    aElements       : ARRAY[1..100] OF ST_XmlElement;
+    nCurrentElement : INT := 0;
+    
+    // Temp variables
+    sTagName        : STRING(255);
+    sTagValue       : STRING(1000);
+    sAttributeName  : STRING(255);
+    sAttributeValue : STRING(255);
+    bInTag          : BOOL;
+    bInValue        : BOOL;
+    bIsClosingTag   : BOOL;
+    nTagStart       : INT;
+    nTagEnd         : INT;
+    
+    // Edge detection
+    bParseEdge      : R_TRIG;
+END_VAR

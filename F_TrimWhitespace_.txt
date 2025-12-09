@@ -1,0 +1,35 @@
+FUNCTION F_TrimWhitespace :  STRING(1000)
+VAR_INPUT
+    sInput : STRING(1000);
+END_VAR
+VAR
+    nStart : INT := 1;
+    nEnd   : INT;
+    sChar  : STRING(1);
+END_VAR
+
+nEnd := LEN(sInput);
+
+// Trim leading whitespace
+WHILE nStart <= nEnd DO
+    sChar := MID(sInput, 1, nStart);
+    IF sChar <> ' ' AND sChar <> '$R' AND sChar <> '$N' AND sChar <> '$T' THEN
+        EXIT;
+    END_IF
+    nStart := nStart + 1;
+END_WHILE
+
+// Trim trailing whitespace
+WHILE nEnd >= nStart DO
+    sChar := MID(sInput, 1, nEnd);
+    IF sChar <> ' ' AND sChar <> '$R' AND sChar <> '$N' AND sChar <> '$T' THEN
+        EXIT;
+    END_IF
+    nEnd := nEnd - 1;
+END_WHILE
+
+IF nStart <= nEnd THEN
+    F_TrimWhitespace := MID(sInput, nEnd - nStart + 1, nStart);
+ELSE
+    F_TrimWhitespace := '';
+END_IF

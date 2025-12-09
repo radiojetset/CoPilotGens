@@ -1,0 +1,10 @@
+TYPE ST_XmlElement : 
+STRUCT
+    sTagName        : STRING(255);      // Name of the XML tag
+    sValue          : STRING(1000);     // Text content of the element
+    sAttributes     : STRING(500);      // Attributes as string
+    nParentIndex    : INT;              // Index of parent element (0 = root)
+    nDepth          : INT;              // Nesting depth
+    bHasChildren    :  BOOL;             // Has child elements
+END_STRUCT
+END_TYPE

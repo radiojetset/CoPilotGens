@@ -1,0 +1,36 @@
+FUNCTION F_GetXmlElementValue : STRING(1000)
+VAR_INPUT
+    sXml     : STRING(10000);   // Full XML string
+    sTagName :  STRING(255);     // Tag name to find
+END_VAR
+VAR
+    nStartTag    : INT;
+    nEndTag      :  INT;
+    nValueStart  : INT;
+    nValueEnd    : INT;
+    sOpenTag     : STRING(260);
+    sCloseTag    : STRING(260);
+END_VAR
+
+// Build tag strings
+sOpenTag := CONCAT('<', sTagName);
+sCloseTag := CONCAT('</', CONCAT(sTagName, '>'));
+
+// Find opening tag
+nStartTag := FIND(sXml, sOpenTag);
+
+IF nStartTag > 0 THEN
+    // Find end of opening tag
+    nValueStart := FIND(MID(sXml, LEN(sXml) - nStartTag + 1, nStartTag), '>');
+    IF nValueStart > 0 THEN
+        nValueStart := nStartTag + nValueStart;
+        
+        // Find closing tag
+        nValueEnd := FIND(MID(sXml, LEN(sXml) - nValueStart + 1, nValueStart), sCloseTag);
+        IF nValueEnd > 0 THEN
+            F_GetXmlElementValue := MID(sXml, nValueEnd - 1, nValueStart);
+        END_IF
+    END_IF
+ELSE
+    F_GetXmlElementValue := '';
+END_IF

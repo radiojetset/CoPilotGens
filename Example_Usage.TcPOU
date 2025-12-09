@@ -1,0 +1,27 @@
+PROGRAM MAIN
+VAR
+    fbXmlParser     : FB_XmlParser;
+    sTestXml        : STRING(10000);
+    bStartParse     : BOOL;
+    
+    // Simple extraction example
+    sExtractedValue : STRING(1000);
+END_VAR
+
+// Example XML to parse
+sTestXml := '<?xml version="1.0"?><root><item id="1"><name>Test Item</name><value>123. 45</value></item><item id="2"><name>Another</name><value>678.90</value></item></root>';
+
+// Parse the XML
+fbXmlParser(
+    sXmlInput := sTestXml,
+    bParse := bStartParse
+);
+
+// Or use the simple extraction function
+sExtractedValue := F_GetXmlElementValue(sTestXml, 'name');
+// Result: 'Test Item'
+
+IF fbXmlParser.bDone THEN
+    // Access parsed elements via fbXmlParser.aElements array
+    // fbXmlParser.nElementCount contains the number of elements found
+END_IF
